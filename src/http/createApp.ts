@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import express, { type Request, type Response } from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { AppConfig } from "../config.js";
+import { AnalyticsReporter } from "../analytics.js";
 import { calculatorDefinitions, type CalculatorId } from "../calculators/index.js";
 import { createCleaningMcpServer } from "../mcp/createServer.js";
 import type { CalculationService } from "../service.js";
@@ -20,11 +21,8 @@ function securityHeaders(_req: Request, res: Response, next: () => void) {
   next();
 }
 
-function logEvent(event: string, fields: Record<string, unknown> = {}) {
-  console.log(JSON.stringify({ timestamp: new Date().toISOString(), event, ...fields }));
-}
-
 function clientType(req: Request): string {
+  if (req.header("x-11fgb-source") === "website") return "website";
   const userAgent = (req.header("user-agent") ?? "").toLowerCase();
   if (userAgent.includes("chatgpt") || userAgent.includes("openai")) return "openai";
   if (userAgent.includes("claude") || userAgent.includes("anthropic")) return "anthropic";
@@ -34,9 +32,29 @@ function clientType(req: Request): string {
   return "other";
 }
 
+function normalizedClient(value: unknown, fallback = "other"): string {
+  if (typeof value !== "string") return fallback;
+  const client = value.toLowerCase();
+  if (client.includes("chatgpt") || client.includes("openai")) return "chatgpt";
+  if (client.includes("claude") || client.includes("anthropic")) return "claude";
+  if (client.includes("perplexity")) return "perplexity";
+  if (client.includes("cursor")) return "cursor";
+  if (client.includes("visual studio code") || client.includes("vscode")) return "vscode";
+  if (client.includes("codex")) return "codex";
+  const clean = client.replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100);
+  return clean || fallback;
+}
+
+function tokenHash(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 export function createApp(config: AppConfig, service: CalculationService) {
   const app = createMcpExpressApp({ host: "0.0.0.0", allowedHosts: ["mcp.11fgb.com", "localhost", "127.0.0.1"] });
   const transports = new Map<string, Transport>();
+  const sessionClients = new Map<string, string>();
+  const analytics = new AnalyticsReporter(config);
+  const logEvent = (event: string, fields: Record<string, unknown> = {}) => analytics.emit(event, fields);
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "64kb" }));
   app.use(securityHeaders);
@@ -108,7 +126,7 @@ export function createApp(config: AppConfig, service: CalculationService) {
       const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
       if (!token) return res.status(400).json({ error: "Missing report token." });
       const result = await service.fromToken(token);
-      logEvent("report_open", { calculator: result.calculator, confidence: result.location.confidence, client: clientType(req) });
+      logEvent("report_open", { calculator: result.calculator, confidence: result.location.confidence, client: clientType(req), correlation_key: tokenHash(token) });
       res.setHeader("Cache-Control", "private, max-age=300");
       return res.json({ result });
     } catch (error) {
@@ -123,7 +141,7 @@ export function createApp(config: AppConfig, service: CalculationService) {
     if (action === "order" && typeof req.body?.report_token === "string") {
       try {
         const result = await service.fromToken(req.body.report_token);
-        logEvent("report_order", { calculator: result.calculator, confidence: result.location.confidence, client: clientType(req) });
+        logEvent("report_order", { calculator: result.calculator, confidence: result.location.confidence, client: clientType(req), action: "order", correlation_key: tokenHash(req.body.report_token) });
         return res.sendStatus(204);
       } catch {
         return res.sendStatus(400);
@@ -132,7 +150,7 @@ export function createApp(config: AppConfig, service: CalculationService) {
     const calculator = typeof req.body?.calculator === "string" ? req.body.calculator : "";
     const confidence = req.body?.confidence === "local" ? "local" : "national";
     if (!allowedActions.has(action) || !(calculator in calculatorDefinitions)) return res.sendStatus(400);
-    logEvent(`report_${action}`, { calculator, confidence, client: clientType(req) });
+    logEvent(`report_${action}`, { calculator, confidence, client: clientType(req), action });
     return res.sendStatus(204);
   });
 
@@ -146,21 +164,31 @@ export function createApp(config: AppConfig, service: CalculationService) {
     try {
       let transport = sessionId ? transports.get(sessionId) : undefined;
       if (!transport && !sessionId && isInitializeRequest(req.body)) {
+        const rawClientName = req.body?.params?.clientInfo?.name;
+        const initializeClient = normalizedClient(rawClientName, clientType(req));
         transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (id) => {
             transports.set(id, transport as Transport);
+            sessionClients.set(id, initializeClient);
           },
         });
         transport.onclose = () => {
-          if (transport?.sessionId) transports.delete(transport.sessionId);
+          if (transport?.sessionId) {
+            transports.delete(transport.sessionId);
+            sessionClients.delete(transport.sessionId);
+          }
         };
         await createCleaningMcpServer(config, service).connect(transport);
+        logEvent("mcp_initialize", { client: initializeClient, client_name: typeof rawClientName === "string" ? rawClientName.slice(0, 100) : initializeClient, transport: "streamable-http" });
       }
       if (!transport) {
         return res.status(400).json({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Invalid or missing MCP session." } });
       }
-      if (isToolCall) logEvent("mcp_tool_call", { tool: req.body?.params?.name, session: Boolean(sessionId), client: clientType(req) });
+      if (isToolCall) {
+        const client = (sessionId ? sessionClients.get(sessionId) : undefined) ?? clientType(req);
+        logEvent("mcp_tool_call", { tool: req.body?.params?.name, session: Boolean(sessionId), client, client_name: client });
+      }
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
       logEvent("mcp_error", { message: error instanceof Error ? error.message : "unknown" });
