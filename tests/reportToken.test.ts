@@ -18,7 +18,9 @@ describe("anonymous report tokens", () => {
 
   it("rejects tampering", () => {
     const sealed = sealReport(key, payload);
-    const tampered = `${sealed.token.slice(0, -1)}${sealed.token.endsWith("a") ? "b" : "a"}`;
+    const position = Math.floor(sealed.token.length / 2);
+    const replacement = sealed.token[position] === "a" ? "b" : "a";
+    const tampered = `${sealed.token.slice(0, position)}${replacement}${sealed.token.slice(position + 1)}`;
     expect(() => openReport(key, tampered)).toThrow("Invalid report token");
   });
 

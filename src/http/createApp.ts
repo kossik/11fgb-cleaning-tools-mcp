@@ -35,7 +35,7 @@ function clientType(req: Request): string {
 }
 
 export function createApp(config: AppConfig, service: CalculationService) {
-  const app = createMcpExpressApp({ host: "0.0.0.0" });
+  const app = createMcpExpressApp({ host: "0.0.0.0", allowedHosts: ["mcp.11fgb.com", "localhost", "127.0.0.1"] });
   const transports = new Map<string, Transport>();
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "64kb" }));
