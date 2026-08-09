@@ -1,0 +1,44 @@
+{
+  "version": "2026-08-01",
+  "source": "11FGB public methodology defaults",
+  "national": {
+    "marketId": "us-national",
+    "marketLabel": "United States national estimate",
+    "laborRate": 52,
+    "priceLowFactor": 0.9,
+    "priceHighFactor": 1.12,
+    "confidence": "national"
+  },
+  "markets": [
+    {
+      "marketId": "central-texas",
+      "marketLabel": "Central Texas",
+      "zipPrefixes": ["786", "787"],
+      "laborRate": 54,
+      "priceLowFactor": 0.94,
+      "priceHighFactor": 1.08,
+      "confidence": "local"
+    }
+  ],
+  "taskRates": {
+    "home.square_feet_per_labor_hour": 680,
+    "home.bedroom_labor_hours": 0.18,
+    "home.bathroom_labor_hours": 0.48,
+    "office.square_feet_per_labor_hour": 2400,
+    "office.workstation_labor_hours": 0.012,
+    "office.restroom_labor_hours": 0.38,
+    "office.kitchen_labor_hours": 0.32,
+    "time.home_productivity": 680,
+    "time.apartment_productivity": 760,
+    "time.office_productivity": 2400,
+    "time.retail_productivity": 2100,
+    "time.vacation_rental_productivity": 580
+  },
+  "chemicalRules": {
+    "all_purpose": { "coverageSqftPerGallon": 9000, "defaultDilutionRatio": 64 },
+    "bathroom": { "coverageSqftPerGallon": 5500, "defaultDilutionRatio": 32 },
+    "floor": { "coverageSqftPerGallon": 12000, "defaultDilutionRatio": 128 },
+    "glass": { "coverageSqftPerGallon": 15000, "defaultDilutionRatio": 64 },
+    "degreaser": { "coverageSqftPerGallon": 4500, "defaultDilutionRatio": 32 }
+  }
+}

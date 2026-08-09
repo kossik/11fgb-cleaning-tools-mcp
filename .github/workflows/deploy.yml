@@ -1,0 +1,52 @@
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: 11fgb-mcp-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    if: github.repository == 'kossik/11fgb-cleaning-tools-mcp'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Configure pinned SSH connection
+        env:
+          DEPLOY_PRIVATE_KEY: ${{ secrets.HETZNER_DEPLOY_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.HETZNER_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_PRIVATE_KEY" > "$HOME/.ssh/11fgb_mcp_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/11fgb_mcp_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/11fgb_mcp_deploy" >/dev/null
+
+      - name: Deploy exact commit
+        env:
+          DEPLOY_HOST: ${{ vars.HETZNER_HOST }}
+          DEPLOY_USER: ${{ vars.HETZNER_USER }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          ssh -i "$HOME/.ssh/11fgb_mcp_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "deploy $GITHUB_SHA"

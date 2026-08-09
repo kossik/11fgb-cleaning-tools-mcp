@@ -1,0 +1,37 @@
+{
+  "name": "@11fgb/cleaning-tools-mcp",
+  "version": "0.1.0",
+  "description": "Free cleaning cost, staffing, time, and chemical-use calculators for MCP clients.",
+  "type": "module",
+  "main": "dist/src/server.js",
+  "files": [
+    "dist",
+    "data",
+    "public"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/src/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "express": "^5.1.0",
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

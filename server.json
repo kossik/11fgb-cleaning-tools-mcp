@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.kossik/11fgb-cleaning-tools",
+  "title": "11FGB Cleaning Tools",
+  "description": "Free US cleaning cost, time, crew-size, and chemical-use calculators with structured results and visual reports.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/kossik/11fgb-cleaning-tools-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.11fgb.com/mcp"
+    }
+  ]
+}
