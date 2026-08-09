@@ -8,6 +8,8 @@ export interface AppConfig {
   reportTokenKey: Buffer;
   calculatorDataUrl?: string;
   calculatorDataToken?: string;
+  analyticsSinkUrl?: string;
+  analyticsSinkToken?: string;
 }
 
 function reportKey(production: boolean): Buffer {
@@ -27,6 +29,11 @@ function reportKey(production: boolean): Buffer {
 
 export function loadConfig(): AppConfig {
   const production = process.env.NODE_ENV === "production";
+  const analyticsSinkUrl = process.env.ANALYTICS_SINK_URL?.trim() || undefined;
+  const analyticsSinkToken = process.env.ANALYTICS_SINK_TOKEN?.trim() || undefined;
+  if (Boolean(analyticsSinkUrl) !== Boolean(analyticsSinkToken)) {
+    throw new Error("ANALYTICS_SINK_URL and ANALYTICS_SINK_TOKEN must be configured together.");
+  }
   return {
     port: Number(process.env.PORT ?? 3400),
     production,
@@ -35,5 +42,7 @@ export function loadConfig(): AppConfig {
     reportTokenKey: reportKey(production),
     calculatorDataUrl: process.env.CALCULATOR_DATA_URL?.trim() || undefined,
     calculatorDataToken: process.env.CALCULATOR_DATA_TOKEN?.trim() || undefined,
+    analyticsSinkUrl,
+    analyticsSinkToken,
   };
 }
