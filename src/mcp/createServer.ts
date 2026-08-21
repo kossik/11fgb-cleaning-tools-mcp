@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Implementation } from "@modelcontextprotocol/sdk/types.js";
 import { calculatorDefinitions } from "../calculators/index.js";
 import type { AppConfig } from "../config.js";
 import { calculationResultSchema } from "../resultSchema.js";
@@ -9,6 +10,22 @@ import type { CalculationService } from "../service.js";
 const UI_RESOURCE_URI = "ui://11fgb/cleaning-calculation.html";
 const uiFile = resolve(process.cwd(), "public", "calculator-app.html");
 
+export const cleaningServerInfo = {
+  name: "11fgb-cleaning-tools",
+  title: "11FGB Cleaning Tools",
+  version: "0.1.0",
+  description:
+    "Free deterministic US cleaning calculators for home and office cost, crew size, job duration, and chemical usage. Returns transparent estimates, assumptions, safety warnings, and interactive visual reports.",
+  websiteUrl: "https://11fgb.com/developers/mcp",
+  icons: [
+    {
+      src: "https://11fgb.com/apple-touch-icon.png",
+      mimeType: "image/png",
+      sizes: ["180x180"],
+    },
+  ],
+} satisfies Implementation;
+
 function resultText(result: Awaited<ReturnType<CalculationService["calculate"]>>): string {
   const details = result.metrics.map((item) => `${item.label}: ${item.value}${item.unit ? ` ${item.unit}` : ""}`).join("; ");
   return `${result.headline}. ${details}. Open the interactive visual report: ${result.visualization_url} Methodology: ${result.methodology_url}`;
@@ -16,7 +33,7 @@ function resultText(result: Awaited<ReturnType<CalculationService["calculate"]>>
 
 export function createCleaningMcpServer(config: AppConfig, service: CalculationService): McpServer {
   const server = new McpServer(
-    { name: "11fgb-cleaning-tools", version: "0.1.0" },
+    cleaningServerInfo,
     {
       instructions:
         "Free US cleaning planning calculators. Use the narrowest matching tool. Treat every price and duration as a non-binding estimate, preserve warnings, and include visualization_url when a user wants to inspect or share the result.",

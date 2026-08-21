@@ -4,15 +4,18 @@ import express, { type Request, type Response } from "express";
 import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { AppConfig } from "../config.js";
 import { AnalyticsReporter } from "../analytics.js";
 import { calculatorDefinitions, type CalculatorId } from "../calculators/index.js";
-import { createCleaningMcpServer } from "../mcp/createServer.js";
+import { createCleaningMcpServer, cleaningServerInfo } from "../mcp/createServer.js";
+import { calculationResultSchema } from "../resultSchema.js";
 import type { CalculationService } from "../service.js";
 import { calculationRateLimit } from "./rateLimit.js";
 
 type Transport = StreamableHTTPServerTransport;
+const calculationEnvelopeSchema = z.object({ result: calculationResultSchema });
 
 function securityHeaders(_req: Request, res: Response, next: () => void) {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -86,13 +89,21 @@ export function createApp(config: AppConfig, service: CalculationService) {
 
   app.get("/.well-known/mcp/server-card.json", (_req, res) => {
     res.json({
-      serverInfo: { name: "11FGB Cleaning Tools", version: "0.1.0" },
+      serverInfo: cleaningServerInfo,
       authentication: { required: false, schemes: [] },
       transport: { type: "streamable-http", url: `${config.publicMcpUrl}/mcp` },
       tools: Object.values(calculatorDefinitions).map((definition) => ({
         name: definition.toolName,
+        title: definition.title,
         description: definition.description,
         inputSchema: zodToJsonSchema(definition.schema, { target: "jsonSchema7" }),
+        outputSchema: zodToJsonSchema(calculationEnvelopeSchema, { target: "jsonSchema7" }),
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: false,
+        },
       })),
       resources: [{ uri: "ui://11fgb/cleaning-calculation.html", name: "Cleaning calculation UI" }],
       prompts: [],
