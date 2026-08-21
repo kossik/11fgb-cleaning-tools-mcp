@@ -99,6 +99,11 @@ export function createApp(config: AppConfig, service: CalculationService) {
     });
   });
 
+  app.get("/.well-known/glama.json", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.sendFile(resolve(process.cwd(), ".well-known", "glama.json"), { dotfiles: "allow" });
+  });
+
   app.use("/ui", express.static(resolve(process.cwd(), "public"), {
     fallthrough: false,
     setHeaders: (res) => {

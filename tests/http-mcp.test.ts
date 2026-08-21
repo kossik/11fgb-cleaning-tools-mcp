@@ -27,6 +27,14 @@ describe("HTTP and MCP contracts", () => {
     const health = await fetch(`${origin}/health`).then((response) => response.json()) as { ok: boolean; calculators: number };
     expect(health).toEqual(expect.objectContaining({ ok: true, calculators: 4 }));
 
+    const glamaResponse = await fetch(`${origin}/.well-known/glama.json`);
+    expect(glamaResponse.status).toBe(200);
+    expect(glamaResponse.headers.get("content-type")).toContain("application/json");
+    await expect(glamaResponse.json()).resolves.toEqual({
+      $schema: "https://glama.ai/mcp/schemas/connector.json",
+      maintainers: [{ email: "kossik@gmail.com" }],
+    });
+
     const response = await fetch(`${origin}/api/v1/calculations/home-cleaning-cost`, {
       method: "POST",
       headers: { "content-type": "application/json" },
