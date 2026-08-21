@@ -35,6 +35,25 @@ describe("HTTP and MCP contracts", () => {
       maintainers: [{ email: "kossik@gmail.com" }],
     });
 
+    const cardResponse = await fetch(`${origin}/.well-known/mcp/server-card.json`);
+    expect(cardResponse.status).toBe(200);
+    const card = await cardResponse.json() as {
+      serverInfo: { title?: string; description?: string; websiteUrl?: string; icons?: unknown[] };
+      tools: Array<{ title?: string; outputSchema?: unknown; annotations?: Record<string, boolean> }>;
+    };
+    expect(card.serverInfo).toEqual(expect.objectContaining({
+      title: "11FGB Cleaning Tools",
+      websiteUrl: "https://11fgb.com/developers/mcp",
+    }));
+    expect(card.serverInfo.description?.length).toBeGreaterThan(120);
+    expect(card.serverInfo.icons).toHaveLength(1);
+    expect(card.tools).toHaveLength(4);
+    for (const tool of card.tools) {
+      expect(tool.title).toBeTruthy();
+      expect(tool.outputSchema).toMatchObject({ type: "object" });
+      expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true });
+    }
+
     const response = await fetch(`${origin}/api/v1/calculations/home-cleaning-cost`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -53,6 +72,10 @@ describe("HTTP and MCP contracts", () => {
     const client = new Client({ name: "11fgb-contract-test", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL(`${origin}/mcp`));
     await client.connect(transport);
+    expect(client.getServerVersion()).toEqual(expect.objectContaining({
+      title: "11FGB Cleaning Tools",
+      websiteUrl: "https://11fgb.com/developers/mcp",
+    }));
     const listed = await client.listTools();
     expect(listed.tools.map((tool) => tool.name).sort()).toEqual([
       "calculate_cleaning_chemical_usage",
