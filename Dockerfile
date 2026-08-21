@@ -16,6 +16,7 @@ RUN apk add --no-cache tini
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY .well-known ./.well-known
 COPY public ./public
 COPY data ./data
 USER node
