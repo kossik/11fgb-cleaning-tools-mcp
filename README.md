@@ -77,7 +77,7 @@ The report token contains only calculator inputs accepted by the public schemas.
 
 ## Methodology and data
 
-The calculation engine is deterministic and versioned. Public fallback rates live in `data/rates.json`; hosted production may supply fresher rate cards through `CALCULATOR_DATA_URL`. A result always identifies its methodology and data version and distinguishes a verified Central Texas market from a national planning fallback.
+The calculation engine is deterministic and versioned. Public fallback rates live in `data/rates.json`; hosted production may supply fresher rate cards through `CALCULATOR_DATA_URL`. That feed is cached in memory for its `max-age` and refreshed in the background, so a calculation never waits on it. A result always identifies its methodology and data version and distinguishes a verified Central Texas market from a national planning fallback.
 
 ## Privacy and security
 
