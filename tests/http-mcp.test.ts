@@ -1,5 +1,6 @@
+import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createApp } from "../src/http/createApp.js";
@@ -11,8 +12,7 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(resolve))));
 });
 
-async function listen() {
-  const config = loadConfig();
+async function listen(config = loadConfig()) {
   const app = createApp(config, new CalculationService(config));
   const server = app.listen(0, "127.0.0.1");
   servers.push(server);
@@ -97,6 +97,45 @@ describe("HTTP and MCP contracts", () => {
     expect(result.structuredContent).toHaveProperty("result.visualization_url");
     expect(result.content).toEqual(expect.arrayContaining([expect.objectContaining({ type: "text" })]));
     await client.close();
+  });
+
+  it("answers calculations and tool calls immediately while the analytics sink hangs", async () => {
+    let sinkRequests = 0;
+    const sink = createServer(() => {
+      sinkRequests += 1;
+    });
+    servers.push({ close: (callback) => { sink.closeAllConnections(); sink.close(callback); } });
+    sink.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => sink.once("listening", resolve));
+    const config = loadConfig();
+    config.analyticsSinkUrl = `http://127.0.0.1:${(sink.address() as AddressInfo).port}/events`;
+    config.analyticsSinkToken = "sink-secret";
+    const origin = await listen(config);
+
+    for (let index = 0; index < 5; index += 1) {
+      const started = performance.now();
+      const response = await fetch(`${origin}/api/v1/calculations/home-cleaning-cost`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postal_code: "78704", square_feet: 1800, bedrooms: 3, bathrooms: 2 }),
+      });
+      expect(response.status).toBe(200);
+      await response.json();
+      expect(performance.now() - started).toBeLessThan(1_000);
+    }
+
+    const client = new Client({ name: "11fgb-sink-outage-test", version: "1.0.0" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${origin}/mcp`)));
+    const started = performance.now();
+    const result = await client.callTool({
+      name: "estimate_home_cleaning_cost",
+      arguments: { postal_code: "78704", square_feet: 1600, bedrooms: 3, bathrooms: 2 },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(performance.now() - started).toBeLessThan(1_000);
+    await client.close();
+
+    await vi.waitFor(() => expect(sinkRequests).toBe(2));
   });
 
   it.each([

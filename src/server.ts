@@ -4,6 +4,8 @@ import { CalculationService } from "./service.js";
 
 const config = loadConfig();
 const service = new CalculationService(config);
+// Warm the rate cache so the first calculations use the private feed instead of the bundled defaults.
+void service.rates.refresh();
 const app = createApp(config, service);
 
 const server = app.listen(config.port, "0.0.0.0", () => {

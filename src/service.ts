@@ -1,16 +1,19 @@
 import type { AppConfig } from "./config.js";
 import { calculatorDefinitions, type CalculatorId } from "./calculators/index.js";
-import { loadRates } from "./rates.js";
+import { RateFeed } from "./rates.js";
 import { openReport, sealReport } from "./security/reportToken.js";
 import type { CalculationResult } from "./types.js";
 
 export class CalculationService {
-  constructor(private readonly config: AppConfig) {}
+  constructor(
+    private readonly config: AppConfig,
+    readonly rates = new RateFeed(config.calculatorDataUrl, config.calculatorDataToken),
+  ) {}
 
   private async core(calculator: CalculatorId, rawInput: unknown) {
     const definition = calculatorDefinitions[calculator];
     const input = definition.schema.parse(rawInput) as Record<string, unknown>;
-    const rates = await loadRates(this.config.calculatorDataUrl, this.config.calculatorDataToken);
+    const rates = this.rates.current();
     const result = definition.calculate(input, rates);
     return { input, result };
   }

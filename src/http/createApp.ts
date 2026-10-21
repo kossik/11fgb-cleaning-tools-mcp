@@ -52,11 +52,10 @@ function tokenHash(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function createApp(config: AppConfig, service: CalculationService) {
+export function createApp(config: AppConfig, service: CalculationService, analytics = new AnalyticsReporter(config)) {
   const app = createMcpExpressApp({ host: "0.0.0.0", allowedHosts: ["mcp.11fgb.com", "localhost", "127.0.0.1"] });
   const transports = new Map<string, Transport>();
   const sessionClients = new Map<string, string>();
-  const analytics = new AnalyticsReporter(config);
   const logEvent = (event: string, fields: Record<string, unknown> = {}) => analytics.emit(event, fields);
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "64kb" }));
